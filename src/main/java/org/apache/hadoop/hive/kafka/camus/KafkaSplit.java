@@ -6,13 +6,26 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 
-public class KafkaSplit implements InputSplit {
+public class KafkaSplit extends FileSplit {
   private List<CamusRequest> requests = new ArrayList<CamusRequest>();
   private long length = 0;
   private String currentTopic = "";
+
+  public KafkaSplit() {
+    // TODO: Passing single spaced path " " is not the best way.
+    // need to figure out better ways of handling this.
+    // path is properly initialized when readFields is called
+    this(new Path(" "));
+  }
+
+  public KafkaSplit(Path path) {
+    super(path, 0, 0, (String[]) null);
+  }
 
   @Override
   public void readFields(DataInput in) throws IOException {
@@ -33,7 +46,7 @@ public class KafkaSplit implements InputSplit {
   }
 
   @Override
-  public long getLength() throws IOException {
+  public long getLength() {
     return length;
   }
 
