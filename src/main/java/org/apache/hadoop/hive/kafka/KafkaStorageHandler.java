@@ -50,7 +50,7 @@ public class KafkaStorageHandler implements HiveStorageHandler {
 
   @Override
   public Class<? extends InputFormat> getInputFormatClass() {
-    return KafkaInputFormat1.class;
+    return KafkaInputFormat.class;
   }
 
   @Override

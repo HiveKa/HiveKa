@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapred.InputSplit;
 
-public class KafkaSplit extends InputSplit implements Writable {
+public class KafkaSplit implements InputSplit {
   private List<CamusRequest> requests = new ArrayList<CamusRequest>();
   private long length = 0;
   private String currentTopic = "";

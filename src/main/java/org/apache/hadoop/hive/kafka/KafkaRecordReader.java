@@ -32,23 +32,21 @@ import org.apache.hadoop.hive.kafka.camus.MessageDecoder;
 import org.apache.hadoop.hive.kafka.camus.MessageDecoderFactory;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.RecordReader;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapred.InputSplit;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobContext;
+import org.apache.hadoop.mapred.Mapper;
+import org.apache.hadoop.mapred.RecordReader;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.TaskAttemptContext;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
 
-@SuppressWarnings({ "deprecation" })
-public class KafkaRecordReader
-    extends RecordReader<KafkaKey, CamusWrapper> {
+public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
   private static final String PRINT_MAX_DECODER_EXCEPTIONS = "max.decoder.exceptions.to.print";
   private static final String DEFAULT_SERVER = "server";
   private static final String DEFAULT_SERVICE = "service";
-  private TaskAttemptContext context;
 
-  private Mapper<KafkaKey, Writable, KafkaKey, Writable>.Context mapperContext;
   private KafkaReader reader;
 
   private long totalBytes;
@@ -71,6 +69,8 @@ public class KafkaRecordReader
   private String statusMsg = "";
 
   KafkaSplit split;
+  JobConf conf;
+  Reporter reporter;
   private static Logger log = Logger.getLogger(KafkaRecordReader.class);
 
   /**
@@ -80,15 +80,12 @@ public class KafkaRecordReader
    * @throws IOException
    * @throws InterruptedException
    */
-  public KafkaRecordReader(InputSplit split, TaskAttemptContext context) throws IOException,
-      InterruptedException {
-    initialize(split, context);
+  public KafkaRecordReader(InputSplit split, JobConf conf, Reporter reporter) throws IOException {
+    initialize(split, conf, reporter);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  @Override
-  public void initialize(InputSplit split, TaskAttemptContext context) throws IOException,
-      InterruptedException {
+  public void initialize(InputSplit split, JobConf conf, Reporter reporter) throws IOException {
     // For class path debugging
     log.info("classpath: " + System.getProperty("java.class.path"));
     ClassLoader loader = KafkaRecordReader.class.getClassLoader();
@@ -97,11 +94,12 @@ public class KafkaRecordReader
     log.info("org.apache.avro.Schema: " + loader.getResource("org/apache/avro/Schema.class"));
 
     this.split = (KafkaSplit) split;
-    this.context = context;
+    this.conf = conf;
+    this.reporter = reporter;
 
-    if (context instanceof Mapper.Context) {
+    /*if (context instanceof Mapper.Context) {
       mapperContext = (Mapper.Context) context;
-    }
+    }*/
 
     this.skipSchemaErrors = false;
 
@@ -164,22 +162,24 @@ public class KafkaRecordReader
     return (float) ((double) getPos() / totalBytes);
   }
 
-  private long getPos() throws IOException {
-    return readBytes;
-  }
+
+    @Override
+    public long getPos() throws IOException {
+        return readBytes;
+    }
 
   @Override
-  public KafkaKey getCurrentKey() throws IOException, InterruptedException {
+  public KafkaKey createKey() {
     return key;
   }
 
   @Override
-  public CamusWrapper getCurrentValue() throws IOException, InterruptedException {
+  public CamusWrapper createValue() {
     return value;
   }
 
   @Override
-  public boolean nextKeyValue() throws IOException, InterruptedException {
+  public boolean next(KafkaKey key, CamusWrapper value) throws IOException {
 
     Message message = null;
 
@@ -205,25 +205,26 @@ public class KafkaRecordReader
           statusMsg += statusMsg.length() > 0 ? "; " : "";
           statusMsg += request.getTopic() + ":" + request.getLeaderId() + ":"
               + request.getPartition();
-          context.setStatus(statusMsg);
+          reporter.setStatus(statusMsg);
 
           if (reader != null) {
             closeReader();
           }
-          reader = new KafkaReader(context, request,
+          reader = new KafkaReader(conf, request,
               30000, // kafka timeout value
               1024 * 1024 // kafka buffer size
           );
 
-          decoder = MessageDecoderFactory.createMessageDecoder(context, request.getTopic());
+          decoder = MessageDecoderFactory.createMessageDecoder(conf, request.getTopic());
         }
         int count = 0;
         while (reader.getNext(key, msgValue, msgKey)) {
           readBytes += key.getMessageSize();
           count++;
-          context.progress();
-          mapperContext.getCounter("total", "data-read").increment(msgValue.getLength());
-          mapperContext.getCounter("total", "event-count").increment(1);
+          reporter.progress();
+          reporter.getCounter("total", "data-read").increment(msgValue.getLength());
+          reporter.getCounter("total", "event-count").increment(1);
+
           byte[] bytes = getBytes(msgValue);
           byte[] keyBytes = getBytes(msgKey);
           // check the checksum of message.
@@ -244,19 +245,12 @@ public class KafkaRecordReader
           try {
             wrapper = getWrappedRecord(key.getTopic(), bytes);
           } catch (Exception e) {
-            if (exceptionCount < getMaximumDecoderExceptionsToPrint(context)) {
-              mapperContext.write(key, new ExceptionWritable(e));
-              exceptionCount++;
-            } else if (exceptionCount == getMaximumDecoderExceptionsToPrint(context)) {
-              exceptionCount = Integer.MAX_VALUE; //Any random value
-              log.info("The same exception has occured for more than " + getMaximumDecoderExceptionsToPrint(context) + " records. All further exceptions will not be printed");
-            }
-            continue;
+              log.warn("bad record!" ,e);
+              continue;
           }
 
           if (wrapper == null) {
-            mapperContext.write(key, new ExceptionWritable(new RuntimeException(
-                "null record")));
+            log.warn("bad record");
             continue;
           }
 
@@ -266,16 +260,16 @@ public class KafkaRecordReader
             key.addAllPartitionMap(wrapper.getPartitionMap());
             setServerService();
           } catch (Exception e) {
-            mapperContext.write(key, new ExceptionWritable(e));
+            log.error("WTF???");
             continue;
           }
 
           if (timeStamp < beginTimeStamp) {
-            mapperContext.getCounter("total", "skip-old").increment(1);
+            //mapperContext.getCounter("total", "skip-old").increment(1);
           } else if (endTimeStamp == 0) {
             DateTime time = new DateTime(timeStamp);
             statusMsg += " begin read at " + time.toString();
-            context.setStatus(statusMsg);
+            reporter.setStatus(statusMsg);
             log.info(key.getTopic() + " begin read at " + time.toString());
             endTimeStamp = (time.plusHours(this.maxPullHours)).getMillis();
           } else if (timeStamp > endTimeStamp || System.currentTimeMillis() > maxPullTime) {
@@ -284,16 +278,15 @@ public class KafkaRecordReader
             if (System.currentTimeMillis() > maxPullTime)
               log.info("Kafka pull time limit reached");
             statusMsg += " max read at " + new DateTime(timeStamp).toString();
-            context.setStatus(statusMsg);
+            reporter.setStatus(statusMsg);
             log.info(key.getTopic() + " max read at "
                 + new DateTime(timeStamp).toString());
-            mapperContext.getCounter("total", "request-time(ms)").increment(
-                reader.getFetchTime());
-            mapperContext.write(key, new ExceptionWritable("Topic not fully pulled, max partition hours reached"));
+            //mapperContext.getCounter("total", "request-time(ms)").increment(reader.getFetchTime());
+            log.error("Topic not fully pulled, max partition hours reached");
             closeReader();
           } else if (System.currentTimeMillis() > maxPullTime) {
             log.info("Max pull time reached");
-            mapperContext.write(key, new ExceptionWritable("Topic not fully pulled, max task time reached"));
+            log.error("Topic not fully pulled, max task time reached");
             closeReader();
           }
 
@@ -301,11 +294,10 @@ public class KafkaRecordReader
           value = wrapper;
           long decodeTime = ((secondTime - tempTime));
 
-          mapperContext.getCounter("total", "decode-time(ms)").increment(decodeTime);
+          //mapperContext.getCounter("total", "decode-time(ms)").increment(decodeTime);
 
           if (reader != null) {
-            mapperContext.getCounter("total", "request-time(ms)").increment(
-                reader.getFetchTime());
+            //mapperContext.getCounter("total", "request-time(ms)").increment(reader.getFetchTime());
           }
           return true;
         }
@@ -315,7 +307,7 @@ public class KafkaRecordReader
       } catch (Throwable t) {
         Exception e = new Exception(t.getLocalizedMessage(), t);
         e.setStackTrace(t.getStackTrace());
-        mapperContext.write(key, new ExceptionWritable(e));
+        log.error("wtf",e);
         reader = null;
         continue;
       }

@@ -1,7 +1,7 @@
 package org.apache.hadoop.hive.kafka.camus;
 
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapred.InputSplit;
+import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
 import java.util.List;
@@ -15,8 +15,8 @@ public abstract class WorkAllocator {
       this.props = props;
   }
 
-  public abstract List<InputSplit> allocateWork(List<CamusRequest> requests,
-      JobContext context) throws IOException ;
+  public abstract InputSplit[] allocateWork(List<CamusRequest> requests,
+      JobConf conf) throws IOException ;
 
 
 }

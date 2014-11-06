@@ -15,7 +15,7 @@ import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 
 import org.apache.hadoop.io.UTF8;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.log4j.Logger;
 
 /**
@@ -29,7 +29,7 @@ import org.apache.log4j.Logger;
 public class KafkaRequest implements CamusRequest {
 
   private static Logger log = Logger.getLogger(KafkaRequest.class);
-  private JobContext context = null;
+  private JobConf conf = null;
   private static final long DEFAULT_OFFSET = 0;
 
   private String topic = "";
@@ -89,8 +89,8 @@ public class KafkaRequest implements CamusRequest {
    * @param partition
    *            The partition to pull
    */
-  public KafkaRequest(JobContext context, String topic, String leaderId, int partition) {
-    this(context, topic, leaderId, partition, null, DEFAULT_OFFSET);
+  public KafkaRequest(JobConf conf, String topic, String leaderId, int partition) {
+    this(conf, topic, leaderId, partition, null, DEFAULT_OFFSET);
   }
 
   /**
@@ -105,8 +105,8 @@ public class KafkaRequest implements CamusRequest {
    * @param brokerUri
    *            The uri for the broker.
    */
-  public KafkaRequest(JobContext context, String topic, String leaderId, int partition, URI brokerUri) {
-    this(context, topic, leaderId, partition, brokerUri, DEFAULT_OFFSET);
+  public KafkaRequest(JobConf conf, String topic, String leaderId, int partition, URI brokerUri) {
+    this(conf, topic, leaderId, partition, brokerUri, DEFAULT_OFFSET);
   }
 
   /**
@@ -123,9 +123,9 @@ public class KafkaRequest implements CamusRequest {
    *            The uri for the broker
    * @param offset
    */
-  public KafkaRequest(JobContext context, String topic, String leaderId, int partition,
+  public KafkaRequest(JobConf conf, String topic, String leaderId, int partition,
                     URI brokerUri, long offset) {
-    this.context = context;
+    this.conf = conf;
     this.topic = topic;
     this.leaderId = leaderId;
     this.uri = brokerUri;
@@ -239,7 +239,7 @@ public class KafkaRequest implements CamusRequest {
    */
   @Override
   public CamusRequest clone() {
-    return new KafkaRequest(context, topic, leaderId, partition, uri, offset);
+    return new KafkaRequest(conf, topic, leaderId, partition, uri, offset);
   }
 
   /* (non-Javadoc)

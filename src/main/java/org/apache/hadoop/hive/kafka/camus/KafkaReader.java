@@ -16,6 +16,7 @@ import kafka.message.Message;
 import kafka.message.MessageAndOffset;
 
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.log4j.Logger;
 
@@ -48,7 +49,7 @@ public class KafkaReader {
   /**
    * Construct using the json representation of the kafka request
    */
-  public KafkaReader(TaskAttemptContext context, KafkaRequest request,
+  public KafkaReader(JobConf conf, KafkaRequest request,
                      int clientTimeout, int fetchBufferSize) throws Exception {
     this.fetchBufferSize = fetchBufferSize;
     this.context = context;

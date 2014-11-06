@@ -1,10 +1,11 @@
 package org.apache.hadoop.hive.kafka.camus;
 
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.InputSplit;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -36,10 +37,9 @@ public class BaseAllocator extends WorkAllocator{
   }
 
   @Override
-  public List<InputSplit> allocateWork(List<CamusRequest> requests,
-      JobContext context) throws IOException {
-    int numTasks = context.getConfiguration()
-        .getInt("mapred.map.tasks", 30);
+  public InputSplit[] allocateWork(List<CamusRequest> requests,
+      JobConf conf) throws IOException {
+    int numTasks = conf.getInt("mapred.map.tasks", 30);
     
     reverseSortRequests(requests);
 
@@ -55,7 +55,9 @@ public class BaseAllocator extends WorkAllocator{
       getSmallestMultiSplit(kafkaETLSplits).addRequest(r);
     }
 
-    return kafkaETLSplits;
+    InputSplit[] inputSplits = new InputSplit[kafkaETLSplits.size()];
+
+    return kafkaETLSplits.toArray(inputSplits);
   }
   
   protected KafkaSplit getSmallestMultiSplit(List<InputSplit> kafkaETLSplits)

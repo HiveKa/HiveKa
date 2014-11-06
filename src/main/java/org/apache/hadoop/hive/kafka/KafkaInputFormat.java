@@ -13,24 +13,18 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.hive.kafka.camus.CamusRequest;
-import org.apache.hadoop.hive.kafka.camus.CamusWrapper;
-import org.apache.hadoop.hive.kafka.camus.KafkaAvroMessageDecoder;
-import org.apache.hadoop.hive.kafka.camus.KafkaKey;
-import org.apache.hadoop.hive.kafka.camus.KafkaRequest;
-import org.apache.hadoop.hive.kafka.camus.LeaderInfo;
-import org.apache.hadoop.hive.kafka.camus.MessageDecoder;
-import org.apache.hadoop.hive.kafka.camus.MessageDecoderFactory;
-import org.apache.hadoop.hive.kafka.camus.WorkAllocator;
+import org.apache.hadoop.hive.kafka.camus.*;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.mapreduce.InputFormat;
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.RecordReader;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.InputFormat;
+import org.apache.hadoop.mapred.InputSplit;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobContext;
+import org.apache.hadoop.mapred.RecordReader;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.TaskAttemptContext;
+
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
@@ -52,7 +46,7 @@ import java.util.regex.Pattern;
 /**
  * Input format for a Kafka pull job.
  */
-public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
+public class KafkaInputFormat implements InputFormat<KafkaKey, CamusWrapper> {
 
 	public static final String KAFKA_BLACKLIST_TOPIC = "kafka.blacklist.topics";
 	public static final String KAFKA_WHITELIST_TOPIC = "kafka.whitelist.topics";
@@ -86,25 +80,24 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 	}
 
 	@Override
-	public RecordReader<KafkaKey, CamusWrapper> createRecordReader(
-			InputSplit split, TaskAttemptContext context) throws IOException,
-			InterruptedException {
-		return new KafkaRecordReader(split, context);
+	public RecordReader<KafkaKey, CamusWrapper> getRecordReader(
+			InputSplit split, JobConf conf, Reporter reporter) throws IOException {
+		return new KafkaRecordReader(split, conf, reporter);
 	}
 
-  public static String getKafkaBrokers(JobContext job) {
-    return job.getConfiguration().get(KafkaBackedTableProperties.KAFKA_URI);
+  public static String getKafkaBrokers(JobConf job) {
+    return job.get(KafkaBackedTableProperties.KAFKA_URI);
   }
 
 	/**
 	 * Gets the metadata from Kafka
 	 * 
-	 * @param context
+	 * @param conf
 	 * @return
 	 */
-	public List<TopicMetadata> getKafkaMetadata(JobContext context) {
+	public List<TopicMetadata> getKafkaMetadata(JobConf conf) {
 		ArrayList<String> metaRequestTopics = new ArrayList<String>();
-		String brokerString = getKafkaBrokers(context);
+		String brokerString = getKafkaBrokers(conf);
 		if (brokerString.isEmpty())
 			throw new InvalidParameterException("kafka.brokers must contain at least one node");
                 List<String> brokers = Arrays.asList(brokerString.split("\\s*,\\s*"));
@@ -114,7 +107,7 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		List<TopicMetadata> topicMetadataList = null;
 		Exception savedException = null;
 		while (i < brokers.size() && !fetchMetaDataSucceeded) {
-			SimpleConsumer consumer = createConsumer(context, brokers.get(i));
+			SimpleConsumer consumer = createConsumer(conf, brokers.get(i));
 			log.info(String.format("Fetching metadata from broker %s with client id %s for %d topic(s) %s",
 			brokers.get(i), consumer.clientId(), metaRequestTopics.size(), metaRequestTopics));
 			try {
@@ -135,10 +128,11 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		return topicMetadataList;
 	}
  
-	private SimpleConsumer createConsumer(JobContext context, String broker) {
+	private SimpleConsumer createConsumer(JobConf conf, String broker) {
 		if (!broker.matches(".+:\\d+"))
 			throw new InvalidParameterException("The kakfa broker " + broker + " must follow address:port pattern");
 		String[] hostPort = broker.split(":");
+    //TODO: get from conf
 		SimpleConsumer consumer = new SimpleConsumer(
 			hostPort[0],
 			Integer.valueOf(hostPort[1]),
@@ -151,12 +145,12 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 	/**
 	 * Gets the latest offsets and create the requests as needed
 	 * 
-	 * @param context
+	 * @param conf
 	 * @param offsetRequestInfo
 	 * @return
 	 */
 	public ArrayList<CamusRequest> fetchLatestOffsetAndCreateKafkaRequests(
-			JobContext context,
+			JobConf conf,
 			HashMap<LeaderInfo, ArrayList<TopicAndPartition>> offsetRequestInfo) {
 		ArrayList<CamusRequest> finalRequests = new ArrayList<CamusRequest>();
 		for (LeaderInfo leader : offsetRequestInfo.keySet()) {
@@ -198,7 +192,7 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 						topicAndPartition.partition())[0];
 				
 				//TODO: factor out kafka specific request functionality 
-				CamusRequest etlRequest = new KafkaRequest(context,
+				CamusRequest etlRequest = new KafkaRequest(conf,
 						topicAndPartition.topic(), Integer.toString(leader
 								.getLeaderId()), topicAndPartition.partition(),
 						leader.getUri());
@@ -239,18 +233,17 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 	}
 
 	@Override
-	public List<InputSplit> getSplits(JobContext context) throws IOException,
-			InterruptedException {
+	public InputSplit[] getSplits(JobConf conf, int numSplits) throws IOException {
 		ArrayList<CamusRequest> finalRequests;
 		HashMap<LeaderInfo, ArrayList<TopicAndPartition>> offsetRequestInfo = new HashMap<LeaderInfo, ArrayList<TopicAndPartition>>();
 		try {
 
 			// Get Metadata for all topics
-			List<TopicMetadata> topicMetadataList = getKafkaMetadata(context);
+			List<TopicMetadata> topicMetadataList = getKafkaMetadata(conf);
 
 			// Filter any white list topics
 			HashSet<String> whiteListTopics = new HashSet<String>(
-					Arrays.asList(getKafkaWhitelistTopic(context)));
+					Arrays.asList(getKafkaWhitelistTopic(conf)));
 			if (!whiteListTopics.isEmpty()) {
 				topicMetadataList = filterWhitelistTopics(topicMetadataList,
 						whiteListTopics);
@@ -258,7 +251,7 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 
 			// Filter all blacklist topics
 			HashSet<String> blackListTopics = new HashSet<String>(
-					Arrays.asList(getKafkaBlacklistTopic(context)));
+					Arrays.asList(getKafkaBlacklistTopic(conf)));
 			String regex = "";
 			if (!blackListTopics.isEmpty()) {
 				regex = createTopicRegEx(blackListTopics);
@@ -267,7 +260,7 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 				if (Pattern.matches(regex, topicMetadata.topic())) {
 					log.info("Discarding topic (blacklisted): "
 							+ topicMetadata.topic());
-				} else if (!createMessageDecoder(context, topicMetadata.topic())) {
+				} else if (!createMessageDecoder(conf, topicMetadata.topic())) {
 					log.info("Discarding topic (Decoder generation failed) : "
 							+ topicMetadata.topic());
 				} else if (topicMetadata.errorCode() != ErrorMapping.NoError()) {
@@ -334,7 +327,7 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 			return null;
 		}
 		// Get the latest offsets and generate the KafkaRequests
-		finalRequests = fetchLatestOffsetAndCreateKafkaRequests(context,
+		finalRequests = fetchLatestOffsetAndCreateKafkaRequests(conf,
 				offsetRequestInfo);
 
 		Collections.sort(finalRequests, new Comparator<CamusRequest>() {
@@ -344,10 +337,10 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		});
 
 		log.info("The requests from kafka metadata are: \n" + finalRequests);		
-		writeRequests(finalRequests, context);
+		//writeRequests(finalRequests, context);
 		Map<CamusRequest, KafkaKey> offsetKeys = getPreviousOffsets(
-				FileInputFormat.getInputPaths(context), context);
-		Set<String> moveLatest = getMoveToLatestTopicsSet(context);
+				FileInputFormat.getInputPaths(conf),conf);
+		Set<String> moveLatest = getMoveToLatestTopicsSet(conf);
 		for (CamusRequest request : finalRequests) {
 			if (moveLatest.contains(request.getTopic())
 					|| moveLatest.contains("all")) {
@@ -396,18 +389,18 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 
 		//writePrevious(offsetKeys.values(), context);
 		
-		WorkAllocator allocator = getWorkAllocator(context);
+		WorkAllocator allocator = getWorkAllocator(conf);
 		Properties props = new Properties();
-		props.putAll(context.getConfiguration().getValByRegex(".*"));
+		props.putAll(conf.getValByRegex(".*"));
 		allocator.init(props);
 		
-		return allocator.allocateWork(finalRequests, context);
+		return allocator.allocateWork(finalRequests, conf);
 	}
 
-	private Set<String> getMoveToLatestTopicsSet(JobContext context) {
+	private Set<String> getMoveToLatestTopicsSet(JobConf conf) {
 		Set<String> topics = new HashSet<String>();
 
-		String[] arr = getMoveToLatestTopics(context);
+		String[] arr = getMoveToLatestTopics(conf);
 
 		if (arr != null) {
 			for (String topic : arr) {
@@ -418,9 +411,9 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		return topics;
 	}
 
-	private boolean createMessageDecoder(JobContext context, String topic) {
+	private boolean createMessageDecoder(JobConf conf, String topic) {
 		try {
-			MessageDecoderFactory.createMessageDecoder(context, topic);
+			MessageDecoderFactory.createMessageDecoder(conf, topic);
 			return true;
 		} catch (Exception e) {
 		  log.error("failed to create decoder", e);
@@ -451,7 +444,7 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 	}
 */
 
-	private void writeRequests(List<CamusRequest> requests, JobContext context)
+/*	private void writeRequests(List<CamusRequest> requests, JobContext context)
 			throws IOException {
 		FileSystem fs = FileSystem.get(context.getConfiguration());
 		Path output = FileOutputFormat.getOutputPath(context);
@@ -471,20 +464,21 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		}
 		writer.close();
 	}
+*/
 
 	private Map<CamusRequest, KafkaKey> getPreviousOffsets(Path[] inputs,
-			JobContext context) throws IOException {
+			JobConf conf) throws IOException {
 		Map<CamusRequest, KafkaKey> offsetKeysMap = new HashMap<CamusRequest, KafkaKey>();
 		for (Path input : inputs) {
-			FileSystem fs = input.getFileSystem(context.getConfiguration());
+			FileSystem fs = input.getFileSystem(conf);
 			for (FileStatus f : fs.listStatus(input, new OffsetFileFilter())) {
 				log.info("previous offset file:" + f.getPath().toString());
 				SequenceFile.Reader reader = new SequenceFile.Reader(fs,
-						f.getPath(), context.getConfiguration());
+						f.getPath(), conf);
 				KafkaKey key = new KafkaKey();
 				while (reader.next(key, NullWritable.get())) {
 				//TODO: factor out kafka specific request functionality 
-					CamusRequest request = new KafkaRequest(context,
+					CamusRequest request = new KafkaRequest(conf,
 							key.getTopic(), key.getLeaderId(),
 							key.getPartition());
 					if (offsetKeysMap.containsKey(request)) {
@@ -508,9 +502,9 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 	    job.getConfiguration().setClass(CAMUS_WORK_ALLOCATOR_CLASS, val, WorkAllocator.class);
 	  }
 
-	  public static WorkAllocator getWorkAllocator(JobContext job) {
+	  public static WorkAllocator getWorkAllocator(JobConf job) {
 	    try {
-        return (WorkAllocator) job.getConfiguration().getClass(org.apache.hadoop.hive.kafka.camus.BaseAllocator).newInstance();
+        return (WorkAllocator) job.getClass(BaseAllocator.class.getName(), BaseAllocator.class).newInstance();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -520,9 +514,8 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		job.getConfiguration().set(KAFKA_MOVE_TO_LAST_OFFSET_LIST, val);
 	}
 
-	public static String[] getMoveToLatestTopics(JobContext job) {
-		return job.getConfiguration()
-				.getStrings(KAFKA_MOVE_TO_LAST_OFFSET_LIST);
+	public static String[] getMoveToLatestTopics(JobConf job) {
+		return job.getStrings(KAFKA_MOVE_TO_LAST_OFFSET_LIST);
 	}
 
 	public static void setKafkaClientBufferSize(JobContext job, int val) {
@@ -571,10 +564,9 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		job.getConfiguration().set(KAFKA_BLACKLIST_TOPIC, val);
 	}
 
-	public static String[] getKafkaBlacklistTopic(JobContext job) {
-		if (job.getConfiguration().get(KAFKA_BLACKLIST_TOPIC) != null
-				&& !job.getConfiguration().get(KAFKA_BLACKLIST_TOPIC).isEmpty()) {
-			return job.getConfiguration().getStrings(KAFKA_BLACKLIST_TOPIC);
+	public static String[] getKafkaBlacklistTopic(JobConf job) {
+		if (job.get(KAFKA_BLACKLIST_TOPIC) != null && !(job.get(KAFKA_BLACKLIST_TOPIC).isEmpty())) {
+			return job.getStrings(KAFKA_BLACKLIST_TOPIC);
 		} else {
 			return new String[] {};
 		}
@@ -584,10 +576,10 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		job.getConfiguration().set(KAFKA_WHITELIST_TOPIC, val);
 	}
 
-	public static String[] getKafkaWhitelistTopic(JobContext job) {
-		if (job.getConfiguration().get(KAFKA_WHITELIST_TOPIC) != null
-				&& !job.getConfiguration().get(KAFKA_WHITELIST_TOPIC).isEmpty()) {
-			return job.getConfiguration().getStrings(KAFKA_WHITELIST_TOPIC);
+	public static String[] getKafkaWhitelistTopic(JobConf job) {
+		if (job.get(KAFKA_WHITELIST_TOPIC) != null
+				&& !job.get(KAFKA_WHITELIST_TOPIC).isEmpty()) {
+			return job.getStrings(KAFKA_WHITELIST_TOPIC);
 		} else {
 			return new String[] {};
 		}
@@ -607,10 +599,6 @@ public class KafkaInputFormat extends InputFormat<KafkaKey, CamusWrapper> {
 		job.getConfiguration().set(ETL_AUDIT_IGNORE_SERVICE_TOPIC_LIST, topics);
 	}
 
-	public static String[] getKafkaAuditIgnoreServiceTopicList(JobContext job) {
-		return job.getConfiguration().getStrings(
-				ETL_AUDIT_IGNORE_SERVICE_TOPIC_LIST, "");
-	}
 
 	public static void setMessageDecoderClass(JobContext job,
 			Class<MessageDecoder> cls) {
