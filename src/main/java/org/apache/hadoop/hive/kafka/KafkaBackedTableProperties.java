@@ -33,6 +33,7 @@ public class KafkaBackedTableProperties {
   public static final String KAFKA_URI = "kafka.service.uri";
   public static final String KAFKA_URL = "kafka.service.url";
   public static final String KAFKA_PORT = "kafka.service.port";
+  public static final String KAFKA_WHITELIST_TOPICS = "kafka.whitelist.topics";
   protected List<String> COLUMN_NAMES;
 
   /*
@@ -46,6 +47,11 @@ public class KafkaBackedTableProperties {
     String kafkaTopic = tableProperties.getProperty(KAFKA_TOPIC);
     LOG.debug("Kafka topic : " + kafkaTopic);
     jobProperties.put(KAFKA_TOPIC, kafkaTopic);
+
+    // Set kafka.whitelist.topics in the jobProperty
+    String kafkaWhitelistTopics = tableProperties.getProperty(KAFKA_WHITELIST_TOPICS);
+    LOG.debug("Kafka whitelist topics : " + kafkaWhitelistTopics);
+    jobProperties.put(KAFKA_WHITELIST_TOPICS, kafkaWhitelistTopics);
 
     // Set kafka.url and kafka.port in the jobProperty
     String kafkaUri = tableProperties.getProperty(KAFKA_URI);
