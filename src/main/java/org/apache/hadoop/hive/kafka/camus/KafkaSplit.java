@@ -32,6 +32,7 @@ public class KafkaSplit extends FileSplit {
 
   @Override
   public void readFields(DataInput in) throws IOException {
+    path = new Path(Text.readString(in));
     int size = in.readInt();
     for (int i = 0; i < size; i++) {
       CamusRequest r = new KafkaRequest();
@@ -43,6 +44,7 @@ public class KafkaSplit extends FileSplit {
 
   @Override
   public void write(DataOutput out) throws IOException {
+    Text.writeString(out, path.toString());
     out.writeInt(requests.size());
     for (CamusRequest r : requests)
       r.write(out);
