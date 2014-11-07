@@ -203,7 +203,7 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, AvroGenericReco
 
           key.set(request.getTopic(), request.getLeaderId(), request.getPartition(),
               request.getOffset(), request.getOffset(), 0);
-          value = null;
+
           log.info("\n\ntopic:" + request.getTopic() + " partition:"
               + request.getPartition() + " beginOffset:" + request.getOffset()
               + " estimatedLastOffset:" + request.getLastOffset());
@@ -268,7 +268,8 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, AvroGenericReco
 
 
           long secondTime = System.currentTimeMillis();
-          value = wrapper;
+          value.setFileSchema(wrapper.getFileSchema());
+          value.setRecord(wrapper.getRecord());
           long decodeTime = ((secondTime - tempTime));
 
           //mapperContext.getCounter("total", "decode-time(ms)").increment(decodeTime);
