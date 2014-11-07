@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "Console",
+  "namespace": "HiveKa.avro",
+  "fields": [ {
+    "name": "message",
+    "type": "string",
+    "doc": "String sent by Console"
+  } ]
+}
