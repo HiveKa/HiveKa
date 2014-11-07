@@ -46,18 +46,22 @@ public class DemoProducer {
     kafkaProducer = new Producer<String, byte[]>(new ProducerConfig(props));
   }
 
+  public static byte[] serializeAvro(Schema schema, GenericRecord event) throws IOException {
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    BinaryEncoder binaryEncoder = EncoderFactory.get().binaryEncoder(stream, null);
+    DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
+    datumWriter.write(event, binaryEncoder);
+    binaryEncoder.flush();
+    IOUtils.closeQuietly(stream);
+
+
+    return stream.toByteArray();
+  }
+
   public void publish(GenericRecord event, String topic, Schema schema) {
     try {
-      ByteArrayOutputStream stream = new ByteArrayOutputStream();
-      BinaryEncoder binaryEncoder = EncoderFactory.get().binaryEncoder(stream, null);
-      DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
-      datumWriter.write(event, binaryEncoder);
-      binaryEncoder.flush();
-      IOUtils.closeQuietly(stream);
-
-
-      Message m = new Message(stream.toByteArray());
-      KeyedMessage<String,byte[]> km = new KeyedMessage<String, byte[]>(topic,m.buffer().array());
+      byte[] m = serializeAvro(schema, event);
+      KeyedMessage<String,byte[]> km = new KeyedMessage<String, byte[]>(topic,m);
       kafkaProducer.send(km);
     } catch (IOException e) {
       throw new RuntimeException("Avro serialization failure", e);
