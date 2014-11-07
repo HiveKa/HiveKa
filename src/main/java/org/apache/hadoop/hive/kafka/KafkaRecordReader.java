@@ -181,7 +181,7 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, AvroGenericReco
 
   @Override
   public AvroGenericRecordWritable createValue() {
-    return value;
+    return new AvroGenericRecordWritable();
   }
 
   @Override
