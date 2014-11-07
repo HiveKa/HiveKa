@@ -1,5 +1,7 @@
 package org.apache.hadoop.hive.kafka.camus;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.InputSplit;
 
@@ -44,10 +46,11 @@ public class BaseAllocator extends WorkAllocator{
     reverseSortRequests(requests);
 
     List<InputSplit> kafkaETLSplits = new ArrayList<InputSplit>();
+    Path[] tablePaths = FileInputFormat.getInputPaths(conf);
 
     for (int i = 0; i < numTasks; i++) {
       if (requests.size() > 0) {
-        kafkaETLSplits.add(new KafkaSplit());
+        kafkaETLSplits.add(new KafkaSplit(tablePaths[0]));
       }
     }
 
