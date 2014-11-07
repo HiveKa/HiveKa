@@ -32,7 +32,6 @@ public class KafkaSplit extends FileSplit {
 
   @Override
   public void readFields(DataInput in) throws IOException {
-    path = new Path(Text.readString(in));
     int size = in.readInt();
     for (int i = 0; i < size; i++) {
       CamusRequest r = new KafkaRequest();
@@ -81,5 +80,10 @@ public class KafkaSplit extends FileSplit {
     }
     else
       return null;
+  }
+
+  @Override
+  public Path getPath() {
+    return path;
   }
 }
