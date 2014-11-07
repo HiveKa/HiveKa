@@ -1,5 +1,7 @@
 package org.apache.hadoop.hive.kafka.camus;
 
+import org.apache.hadoop.hive.serde2.avro.AvroGenericRecordWritable;
+
 import java.util.Properties;
 
 /**
@@ -20,6 +22,6 @@ public abstract class MessageDecoder<M,R> {
     this.topicName = topicName;
   }
 
-  public abstract CamusWrapper<R> decode(M message) ;
+  public abstract AvroGenericRecordWritable decode(M message) ;
 
 }

@@ -55,6 +55,7 @@ public class DemoProducer {
       binaryEncoder.flush();
       IOUtils.closeQuietly(stream);
 
+
       Message m = new Message(stream.toByteArray());
       KeyedMessage<String,byte[]> km = new KeyedMessage<String, byte[]>(topic,m.buffer().array());
       kafkaProducer.send(km);

@@ -3,12 +3,14 @@ package org.apache.hadoop.hive.kafka.camus;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.kafka.KafkaBackedTableProperties;
+import org.apache.hadoop.hive.serde2.avro.AvroGenericRecordWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 
@@ -130,19 +132,16 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 		}
 	}
 
-	public CamusWrapper<Record> decode(byte[] payload) {
+	public AvroGenericRecordWritable decode(byte[] payload) {
 		try {
 			MessageDecoderHelper helper = new MessageDecoderHelper(registry,
 					topicName, payload).invoke();
       DatumReader<Record> reader = new GenericDatumReader<Record>(helper.getTargetSchema());
-			/*DatumReader<Record> reader = (helper.getTargetSchema() == null) ? new
-          GenericDatumReader<Record>(
-					helper.getSchema()) : new GenericDatumReader<Record>(
-					helper.getSchema(), helper.getTargetSchema());
-      */
-			return new CamusAvroWrapper(reader.read(null, decoderFactory
-                    .binaryDecoder(helper.getBuffer().array(),
-                            helper.getStart(), helper.getLength(), null)));
+
+		  GenericRecord record = reader.read(null, decoderFactory.binaryDecoder(helper.getBuffer().array(),
+          helper.getStart(), helper.getLength(), null));
+
+      return new AvroGenericRecordWritable(record);
 	
 		} catch (IOException e) {
 			throw new MessageDecoderException(e);

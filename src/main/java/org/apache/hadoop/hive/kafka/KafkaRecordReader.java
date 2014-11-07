@@ -21,6 +21,11 @@ import java.io.IOException;
 import java.util.HashSet;
 
 import kafka.message.Message;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.Decoder;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.hive.kafka.camus.CamusWrapper;
 import org.apache.hadoop.hive.kafka.camus.ExceptionWritable;
@@ -30,6 +35,7 @@ import org.apache.hadoop.hive.kafka.camus.KafkaRequest;
 import org.apache.hadoop.hive.kafka.camus.KafkaSplit;
 import org.apache.hadoop.hive.kafka.camus.MessageDecoder;
 import org.apache.hadoop.hive.kafka.camus.MessageDecoderFactory;
+import org.apache.hadoop.hive.serde2.avro.AvroGenericRecordWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.InputSplit;
@@ -42,7 +48,7 @@ import org.apache.hadoop.mapred.TaskAttemptContext;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
 
-public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
+public class KafkaRecordReader implements RecordReader<KafkaKey, AvroGenericRecordWritable> {
   private static final String PRINT_MAX_DECODER_EXCEPTIONS = "max.decoder.exceptions.to.print";
   private static final String DEFAULT_SERVER = "server";
   private static final String DEFAULT_SERVICE = "service";
@@ -57,7 +63,7 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
   private final BytesWritable msgValue = new BytesWritable();
   private final BytesWritable msgKey = new BytesWritable();
   private final KafkaKey key = new KafkaKey();
-  private CamusWrapper value;
+  private AvroGenericRecordWritable value;
 
   private int maxPullHours = 0;
   private int exceptionCount = 0;
@@ -121,8 +127,8 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
     }
   }
 
-  private CamusWrapper getWrappedRecord(String topicName, byte[] payload) throws IOException {
-    CamusWrapper r = null;
+  private AvroGenericRecordWritable getWrappedRecord(String topicName, byte[] payload) throws IOException {
+    AvroGenericRecordWritable r = null;
     try {
       r = decoder.decode(payload);
     } catch (Exception e) {
@@ -174,12 +180,12 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
   }
 
   @Override
-  public CamusWrapper createValue() {
+  public AvroGenericRecordWritable createValue() {
     return value;
   }
 
   @Override
-  public boolean next(KafkaKey key, CamusWrapper value) throws IOException {
+  public boolean next(KafkaKey key, AvroGenericRecordWritable value) throws IOException {
 
     Message message = null;
 
@@ -241,7 +247,10 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
           }
 
           long tempTime = System.currentTimeMillis();
-          CamusWrapper wrapper;
+
+
+
+          AvroGenericRecordWritable wrapper;
           try {
             wrapper = getWrappedRecord(key.getTopic(), bytes);
           } catch (Exception e) {
@@ -254,41 +263,9 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
             continue;
           }
 
-          long timeStamp = wrapper.getTimestamp();
-          try {
-            key.setTime(timeStamp);
-            key.addAllPartitionMap(wrapper.getPartitionMap());
-            setServerService();
-          } catch (Exception e) {
-            log.error("WTF???");
-            continue;
-          }
 
-          if (timeStamp < beginTimeStamp) {
-            //mapperContext.getCounter("total", "skip-old").increment(1);
-          } else if (endTimeStamp == 0) {
-            DateTime time = new DateTime(timeStamp);
-            statusMsg += " begin read at " + time.toString();
-            //reporter.setStatus(statusMsg);
-            log.info(key.getTopic() + " begin read at " + time.toString());
-            endTimeStamp = (time.plusHours(this.maxPullHours)).getMillis();
-          } else if (timeStamp > endTimeStamp || System.currentTimeMillis() > maxPullTime) {
-            if (timeStamp > endTimeStamp)
-              log.info("Kafka Max history hours reached");
-            if (System.currentTimeMillis() > maxPullTime)
-              log.info("Kafka pull time limit reached");
-            statusMsg += " max read at " + new DateTime(timeStamp).toString();
-            //reporter.setStatus(statusMsg);
-            log.info(key.getTopic() + " max read at "
-                + new DateTime(timeStamp).toString());
-            //mapperContext.getCounter("total", "request-time(ms)").increment(reader.getFetchTime());
-            log.error("Topic not fully pulled, max partition hours reached");
-            closeReader();
-          } else if (System.currentTimeMillis() > maxPullTime) {
-            log.info("Max pull time reached");
-            log.error("Topic not fully pulled, max task time reached");
-            closeReader();
-          }
+
+
 
           long secondTime = System.currentTimeMillis();
           value = wrapper;
