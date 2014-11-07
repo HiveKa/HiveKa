@@ -19,6 +19,7 @@ package org.apache.hadoop.hive.kafka.demoproducer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import com.google.common.collect.Lists;
@@ -38,11 +39,11 @@ import java.util.UUID;
 
 public class DemoProducer {
 
-  private final Producer<String, Message> kafkaProducer;
+  private final Producer<String, byte[]> kafkaProducer;
 
   public DemoProducer(Properties props) {
 
-    kafkaProducer = new Producer<String, Message>(new ProducerConfig(props));
+    kafkaProducer = new Producer<String, byte[]>(new ProducerConfig(props));
   }
 
   public void publish(GenericRecord event, String topic, Schema schema) {
@@ -55,7 +56,8 @@ public class DemoProducer {
       IOUtils.closeQuietly(stream);
 
       Message m = new Message(stream.toByteArray());
-      kafkaProducer.send(new KeyedMessage<String, Message>(topic,UUID.randomUUID().toString(),m));
+      KeyedMessage<String,byte[]> km = new KeyedMessage<String, byte[]>(topic,m.buffer().array());
+      kafkaProducer.send(km);
     } catch (IOException e) {
       throw new RuntimeException("Avro serialization failure", e);
     }
@@ -70,6 +72,7 @@ public class DemoProducer {
     props.put("metadata.broker.list", args[2]);
     props.put("request.required.acks", "-1");
     props.put("serializer.class", "kafka.serializer.DefaultEncoder");
+    props.put("key.serializer.class", "kafka.serializer.StringEncoder");
     props.put("producer.type", "sync");
 
     DemoProducer demo = new DemoProducer(props);
