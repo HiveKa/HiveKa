@@ -14,6 +14,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hive.kafka.camus.*;
+import org.apache.hadoop.hive.serde2.avro.AvroGenericRecordWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.mapred.FileInputFormat;
@@ -46,7 +47,7 @@ import java.util.regex.Pattern;
 /**
  * Input format for a Kafka pull job.
  */
-public class KafkaInputFormat implements InputFormat<KafkaKey, CamusWrapper> {
+public class KafkaInputFormat implements InputFormat<KafkaKey, AvroGenericRecordWritable> {
 
 	public static final String KAFKA_BLACKLIST_TOPIC = "kafka.blacklist.topics";
 	public static final String KAFKA_WHITELIST_TOPIC = "kafka.whitelist.topics";
@@ -80,7 +81,7 @@ public class KafkaInputFormat implements InputFormat<KafkaKey, CamusWrapper> {
 	}
 
 	@Override
-	public RecordReader<KafkaKey, CamusWrapper> getRecordReader(
+	public RecordReader<KafkaKey, AvroGenericRecordWritable> getRecordReader(
 			InputSplit split, JobConf conf, Reporter reporter) throws IOException {
 		return new KafkaRecordReader(split, conf, reporter);
 	}
