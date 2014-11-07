@@ -5,10 +5,16 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.kafka.KafkaBackedTableProperties;
 import org.apache.hadoop.io.Text;
+import org.apache.log4j.Logger;
 
-import java.io.File;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 
@@ -16,10 +22,14 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 	protected DecoderFactory decoderFactory;
 	protected SchemaRegistry<Schema> registry;
 	private Schema latestSchema;
+  private static Logger log = null;
 	
 	@Override
 	public void init(Properties props, String topicName) {
-	    super.init(props, topicName);
+    super.init(props, topicName);
+    if (log == null) {
+      log = Logger.getLogger(getClass());
+    }
 	    try {
             SchemaRegistry<Schema> registry = (SchemaRegistry<Schema>) Class
                     .forName("org.apache.hadoop.hive.kafka.camus" +
@@ -31,12 +41,22 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
         //this.latestSchema = registry.getLatestSchemaByTopic(topicName).getSchema();
         Schema.Parser parser = new Schema.Parser();
         Schema schema;
-        File file = null;
+
+        final String schemaFile = props.getProperty(KafkaBackedTableProperties.KAFKA_AVRO_SCHEMA_FILE);
+        Path pt=new Path(schemaFile);
+        FileSystem fs = FileSystem.get(new Configuration());
+        BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(pt)));
+        StringBuilder line = new StringBuilder();
+        String tempLine = br.readLine();
+        while (tempLine != null){
+          line.append(tempLine);
+          tempLine = br.readLine();
+        }
+        log.info("Avro schema: " + line.toString());
         try {
-          file = new File("/tmp/test.avsc");
-          schema = parser.parse(file);
-        } catch (IOException e) {
-          throw new RuntimeException("Failed to parse Avro schema from " + file.getName(), e);
+          schema = parser.parse(line.toString());
+        } catch (Exception e) {
+          throw new RuntimeException("Failed to parse Avro schema from " + schemaFile, e);
         }
             this.latestSchema = schema;
         } catch (Exception e) {
@@ -88,20 +108,21 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 
 		private ByteBuffer getByteBuffer(byte[] payload) {
 			ByteBuffer buffer = ByteBuffer.wrap(payload);
-			if (buffer.get() != MAGIC_BYTE)
-				throw new IllegalArgumentException("Unknown magic byte!");
+			//if (buffer.get() != MAGIC_BYTE)
+			//	throw new IllegalArgumentException("Unknown magic byte!");
 			return buffer;
 		}
 
 		public MessageDecoderHelper invoke() {
 			buffer = getByteBuffer(payload);
-			String id = Integer.toString(buffer.getInt());
-			schema = registry.getSchemaByID(topicName, id);
-			if (schema == null)
-				throw new IllegalStateException("Unknown schema id: " + id);
+			//String id = Integer.toString(buffer.getInt());
+			//schema = registry.getSchemaByID(topicName, id);
+			//if (schema == null)
+			//	throw new IllegalStateException("Unknown schema id: " + id);
 
 			start = buffer.position() + buffer.arrayOffset();
-			length = buffer.limit() - 5;
+      //length = buffer.limit() - 5;
+      length = buffer.limit();
 
 			// try to get a target schema, if any
 			targetSchema = latestSchema;
@@ -113,10 +134,12 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 		try {
 			MessageDecoderHelper helper = new MessageDecoderHelper(registry,
 					topicName, payload).invoke();
-			DatumReader<Record> reader = (helper.getTargetSchema() == null) ? new GenericDatumReader<Record>(
+      DatumReader<Record> reader = new GenericDatumReader<Record>(helper.getTargetSchema());
+			/*DatumReader<Record> reader = (helper.getTargetSchema() == null) ? new
+          GenericDatumReader<Record>(
 					helper.getSchema()) : new GenericDatumReader<Record>(
 					helper.getSchema(), helper.getTargetSchema());
-
+      */
 			return new CamusAvroWrapper(reader.read(null, decoderFactory
                     .binaryDecoder(helper.getBuffer().array(),
                             helper.getStart(), helper.getLength(), null)));

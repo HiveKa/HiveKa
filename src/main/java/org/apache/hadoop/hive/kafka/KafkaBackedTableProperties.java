@@ -34,6 +34,7 @@ public class KafkaBackedTableProperties {
   public static final String KAFKA_URL = "kafka.service.url";
   public static final String KAFKA_PORT = "kafka.service.port";
   public static final String KAFKA_WHITELIST_TOPICS = "kafka.whitelist.topics";
+  public static final String KAFKA_AVRO_SCHEMA_FILE = "kafka.avro.schema.file";
   protected List<String> COLUMN_NAMES;
 
   /*
@@ -52,6 +53,11 @@ public class KafkaBackedTableProperties {
     String kafkaWhitelistTopics = tableProperties.getProperty(KAFKA_WHITELIST_TOPICS);
     LOG.debug("Kafka whitelist topics : " + kafkaWhitelistTopics);
     jobProperties.put(KAFKA_WHITELIST_TOPICS, kafkaWhitelistTopics);
+
+    // Set kafka.avro.schema.file in the jobProperty
+    String kafkaAvroSchemaFile = tableProperties.getProperty(KAFKA_AVRO_SCHEMA_FILE);
+    LOG.debug("Kafka avro schema file : " + kafkaAvroSchemaFile);
+    jobProperties.put(KAFKA_AVRO_SCHEMA_FILE, kafkaAvroSchemaFile);
 
     // Set kafka.url and kafka.port in the jobProperty
     String kafkaUri = tableProperties.getProperty(KAFKA_URI);

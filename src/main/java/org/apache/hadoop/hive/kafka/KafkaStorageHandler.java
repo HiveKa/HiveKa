@@ -25,6 +25,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
 import org.apache.hadoop.hive.serde2.SerDe;
+import org.apache.hadoop.hive.serde2.avro.AvroSerDe;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
@@ -60,7 +61,7 @@ public class KafkaStorageHandler implements HiveStorageHandler {
 
   @Override
   public Class<? extends SerDe> getSerDeClass() {
-    return LazyBinarySerDe.class;
+    return AvroSerDe.class;
   }
 
   @Override
