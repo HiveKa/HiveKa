@@ -141,7 +141,11 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 		  GenericRecord record = reader.read(null, decoderFactory.binaryDecoder(helper.getBuffer().array(),
           helper.getStart(), helper.getLength(), null));
 
-      return new AvroGenericRecordWritable(record);
+
+      AvroGenericRecordWritable grw = new AvroGenericRecordWritable(record);
+      grw.setFileSchema(latestSchema);
+
+      return grw;
 	
 		} catch (IOException e) {
 			throw new MessageDecoderException(e);
