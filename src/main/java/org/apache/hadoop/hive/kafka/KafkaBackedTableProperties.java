@@ -29,7 +29,6 @@ import java.util.Properties;
 
 public class KafkaBackedTableProperties {
   private static final Logger LOG = Logger.getLogger(KafkaBackedTableProperties.class);
-  public static final String KAFKA_TOPIC = "kafka.topic";
   public static final String KAFKA_URI = "kafka.service.uri";
   public static final String KAFKA_URL = "kafka.service.url";
   public static final String KAFKA_PORT = "kafka.service.port";
@@ -43,11 +42,6 @@ public class KafkaBackedTableProperties {
    */
   public void initialize(Properties tableProperties, Map<String,String> jobProperties,
                          TableDesc tableDesc) {
-
-    // Set kafka.topic in the jobProperty
-    String kafkaTopic = tableProperties.getProperty(KAFKA_TOPIC);
-    LOG.debug("Kafka topic : " + kafkaTopic);
-    jobProperties.put(KAFKA_TOPIC, kafkaTopic);
 
     // Set kafka.whitelist.topics in the jobProperty
     String kafkaWhitelistTopics = tableProperties.getProperty(KAFKA_WHITELIST_TOPICS);
