@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -15,6 +16,7 @@ public class KafkaSplit extends FileSplit {
   private List<CamusRequest> requests = new ArrayList<CamusRequest>();
   private long length = 0;
   private String currentTopic = "";
+  private Path path;
 
   public KafkaSplit() {
     // TODO: Passing single spaced path " " is not the best way.
@@ -25,10 +27,12 @@ public class KafkaSplit extends FileSplit {
 
   public KafkaSplit(Path path) {
     super(path, 0, 0, (String[]) null);
+    this.path = path;
   }
 
   @Override
   public void readFields(DataInput in) throws IOException {
+    path = new Path(Text.readString(in));
     int size = in.readInt();
     for (int i = 0; i < size; i++) {
       CamusRequest r = new KafkaRequest();
