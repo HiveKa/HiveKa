@@ -46,13 +46,6 @@ public class KafkaSerDe extends LazyBinarySerDe {
    */
   @Override
   public void initialize(Configuration conf, Properties tbl) throws SerDeException {
-    final String tableName = tbl.getProperty(TABLE_NAME);
-    if (tbl.getProperty(KafkaBackedTableProperties.KAFKA_TOPIC, null) == null) {
-      tbl.setProperty(KafkaBackedTableProperties.KAFKA_TOPIC, tableName);
-    }
-    LOG.info(KafkaBackedTableProperties.KAFKA_TOPIC + ": " + tbl.getProperty
-        (KafkaBackedTableProperties.KAFKA_TOPIC));
-
     super.initialize(conf, tbl);
   }
 
