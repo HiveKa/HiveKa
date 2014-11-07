@@ -39,35 +39,6 @@ import java.util.UUID;
 
 public class DemoProducer {
 
-  private final Producer<String, byte[]> kafkaProducer;
-
-  public DemoProducer(Properties props) {
-
-    kafkaProducer = new Producer<String, byte[]>(new ProducerConfig(props));
-  }
-
-  public static byte[] serializeAvro(Schema schema, GenericRecord event) throws IOException {
-    ByteArrayOutputStream stream = new ByteArrayOutputStream();
-    BinaryEncoder binaryEncoder = EncoderFactory.get().binaryEncoder(stream, null);
-    DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
-    datumWriter.write(event, binaryEncoder);
-    binaryEncoder.flush();
-    IOUtils.closeQuietly(stream);
-
-
-    return stream.toByteArray();
-  }
-
-  public void publish(GenericRecord event, String topic, Schema schema) {
-    try {
-      byte[] m = serializeAvro(schema, event);
-      KeyedMessage<String,byte[]> km = new KeyedMessage<String, byte[]>(topic,m);
-      kafkaProducer.send(km);
-    } catch (IOException e) {
-      throw new RuntimeException("Avro serialization failure", e);
-    }
-  }
-
   public static void main(String[] args) {
     Properties props = new Properties();
 
@@ -80,7 +51,7 @@ public class DemoProducer {
     props.put("key.serializer.class", "kafka.serializer.StringEncoder");
     props.put("producer.type", "sync");
 
-    DemoProducer demo = new DemoProducer(props);
+    BaseProducer demo = new BaseProducer(props);
 
     Schema schema = new Schema.Parser().parse("{\n" +
         "\t\"type\":\"record\",\n" +
@@ -103,6 +74,6 @@ public class DemoProducer {
       event.put("b", "static string");
       demo.publish(event, topic, schema);
     }
-    demo.kafkaProducer.close();
+    demo.close();
   }
 }

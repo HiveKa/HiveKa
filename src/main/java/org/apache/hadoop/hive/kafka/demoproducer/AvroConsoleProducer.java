@@ -75,8 +75,7 @@ public class AvroConsoleProducer {
 
 
     String topic = args[0];
-    int iters = Integer.parseInt(args[1]);
-    props.put("metadata.broker.list", args[2]);
+    props.put("metadata.broker.list", args[1]);
     props.put("request.required.acks", "-1");
     props.put("serializer.class", "kafka.serializer.DefaultEncoder");
     props.put("key.serializer.class", "kafka.serializer.StringEncoder");
@@ -100,4 +99,5 @@ public class AvroConsoleProducer {
     }
 
   }
+
 }

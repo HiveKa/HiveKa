@@ -12,7 +12,7 @@ import org.apache.avro.io.EncoderFactory;
 import org.junit.Test;
 import org.junit.Assert;
 
-public class DemoProducerTest {
+public class BaseProducerTest {
 
   @Test
   public void testSerializeAvro() throws Exception {
@@ -37,7 +37,7 @@ public class DemoProducerTest {
     event.put("a", 1);
     event.put("b", "static string");
 
-    byte[] m = DemoProducer.serializeAvro(schema,event);
+    byte[] m = BaseProducer.serializeAvro(schema,event);
 
     DatumReader<GenericData.Record> reader = new GenericDatumReader<GenericData.Record>(schema);
     BinaryDecoder binaryDecoder = DecoderFactory.get().binaryDecoder(m,null);

@@ -17,12 +17,10 @@
  */
 package org.apache.hadoop.hive.kafka.demoproducer;
 
-import HiveKa.avro.Tweet;
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
 import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
@@ -34,33 +32,38 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-public class FakeTweetProducer {
+public class BaseProducer {
+
+  private final Producer<String, byte[]> kafkaProducer;
+
+  public BaseProducer(Properties props) {
+
+    kafkaProducer = new Producer<String, byte[]>(new ProducerConfig(props));
+  }
+
+  public static byte[] serializeAvro(Schema schema, GenericRecord event) throws IOException {
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    BinaryEncoder binaryEncoder = EncoderFactory.get().binaryEncoder(stream, null);
+    DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
+    datumWriter.write(event, binaryEncoder);
+    binaryEncoder.flush();
+    IOUtils.closeQuietly(stream);
 
 
-  public static void main(String[] args) {
-    Properties props = new Properties();
-    String[] names = new String[] {"gwenshap","hkszehon","singhasdev"};
+    return stream.toByteArray();
+  }
 
-
-    String topic = args[0];
-    int iters = Integer.parseInt(args[1]);
-    props.put("metadata.broker.list", args[2]);
-    props.put("request.required.acks", "-1");
-    props.put("serializer.class", "kafka.serializer.DefaultEncoder");
-    props.put("key.serializer.class", "kafka.serializer.StringEncoder");
-    props.put("producer.type", "sync");
-
-    BaseProducer demo = new BaseProducer(props);
-
-    Tweet tweet = new Tweet();
-    SentGen sent = new SentGen();
-
-    for (int i = 1; i < iters; i++) {
-      tweet.setUsername(names[i%names.length]);
-      tweet.setTimestamp(System.currentTimeMillis() / 1000);
-      tweet.setText(sent.nextSent());
-      demo.publish(tweet, topic, tweet.getSchema());
+  public void publish(GenericRecord event, String topic, Schema schema) {
+    try {
+      byte[] m = serializeAvro(schema, event);
+      KeyedMessage<String,byte[]> km = new KeyedMessage<String, byte[]>(topic,m);
+      kafkaProducer.send(km);
+    } catch (IOException e) {
+      throw new RuntimeException("Avro serialization failure", e);
     }
-    demo.close();
+  }
+
+  public void close() {
+    kafkaProducer.close();
   }
 }
