@@ -221,9 +221,9 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
         while (reader.getNext(key, msgValue, msgKey)) {
           readBytes += key.getMessageSize();
           count++;
-          reporter.progress();
-          reporter.getCounter("total", "data-read").increment(msgValue.getLength());
-          reporter.getCounter("total", "event-count").increment(1);
+          //reporter.progress();
+          //reporter.getCounter("total", "data-read").increment(msgValue.getLength());
+          //reporter.getCounter("total", "event-count").increment(1);
 
           byte[] bytes = getBytes(msgValue);
           byte[] keyBytes = getBytes(msgKey);
@@ -269,7 +269,7 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
           } else if (endTimeStamp == 0) {
             DateTime time = new DateTime(timeStamp);
             statusMsg += " begin read at " + time.toString();
-            reporter.setStatus(statusMsg);
+            //reporter.setStatus(statusMsg);
             log.info(key.getTopic() + " begin read at " + time.toString());
             endTimeStamp = (time.plusHours(this.maxPullHours)).getMillis();
           } else if (timeStamp > endTimeStamp || System.currentTimeMillis() > maxPullTime) {
@@ -278,7 +278,7 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, CamusWrapper> {
             if (System.currentTimeMillis() > maxPullTime)
               log.info("Kafka pull time limit reached");
             statusMsg += " max read at " + new DateTime(timeStamp).toString();
-            reporter.setStatus(statusMsg);
+            //reporter.setStatus(statusMsg);
             log.info(key.getTopic() + " max read at "
                 + new DateTime(timeStamp).toString());
             //mapperContext.getCounter("total", "request-time(ms)").increment(reader.getFetchTime());

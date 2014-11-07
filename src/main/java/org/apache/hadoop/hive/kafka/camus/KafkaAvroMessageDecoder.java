@@ -7,6 +7,7 @@ import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.hadoop.io.Text;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
@@ -27,7 +28,17 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
             registry.init(props);
             
             this.registry = new CachedSchemaRegistry<Schema>(registry);
-            this.latestSchema = registry.getLatestSchemaByTopic(topicName).getSchema();
+        //this.latestSchema = registry.getLatestSchemaByTopic(topicName).getSchema();
+        Schema.Parser parser = new Schema.Parser();
+        Schema schema;
+        File file = null;
+        try {
+          file = new File("/tmp/test.avsc");
+          schema = parser.parse(file);
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to parse Avro schema from " + file.getName(), e);
+        }
+            this.latestSchema = schema;
         } catch (Exception e) {
             throw new MessageDecoderException(e);
         }

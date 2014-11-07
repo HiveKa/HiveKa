@@ -15,6 +15,20 @@
         <include>org.apache.kafka:kafka_2.10</include>
       </includes>
     </dependencySet>
+    <dependencySet>
+      <unpack>false</unpack>
+      <scope>runtime</scope>
+      <includes>
+        <include>org.scala-lang:scala-library</include>
+      </includes>
+    </dependencySet>
+    <dependencySet>
+      <unpack>false</unpack>
+      <scope>runtime</scope>
+      <includes>
+        <include>com.yammer.metrics:metrics-core</include>
+      </includes>
+    </dependencySet>
   </dependencySets>
 
   <fileSets>
