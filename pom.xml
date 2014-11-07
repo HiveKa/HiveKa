@@ -49,6 +49,11 @@
       <artifactId>joda-time</artifactId>
       <version>2.1</version>
     </dependency>
+  <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>1.6.3</version>
+  </dependency>
   </dependencies>
 
   <repositories>
@@ -88,6 +93,31 @@
           </execution>
         </executions>
       </plugin>
+        <plugin>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro-maven-plugin</artifactId>
+            <version>1.6.3</version>
+            <executions>
+                <execution>
+                    <phase>generate-sources</phase>
+                    <goals>
+                        <goal>schema</goal>
+                    </goals>
+                    <configuration>
+                        <sourceDirectory>${project.basedir}/src/main/avro/</sourceDirectory>
+                        <outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <source>1.6</source>
+                <target>1.6</target>
+            </configuration>
+        </plugin>
 
     </plugins>
 
