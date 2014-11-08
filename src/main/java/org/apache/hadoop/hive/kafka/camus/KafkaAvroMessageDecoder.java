@@ -9,6 +9,7 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.kafka.AvroSchemaGenerator;
 import org.apache.hadoop.hive.kafka.KafkaBackedTableProperties;
 import org.apache.hadoop.hive.serde2.avro.AvroGenericRecordWritable;
 import org.apache.hadoop.io.Text;
@@ -32,41 +33,58 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
     if (log == null) {
       log = Logger.getLogger(getClass());
     }
-	    try {
-            SchemaRegistry<Schema> registry = (SchemaRegistry<Schema>) Class
-                    .forName("org.apache.hadoop.hive.kafka.camus" +
-                                ".MemorySchemaRegistry").newInstance();
-            
-            registry.init(props);
-            
-            this.registry = new CachedSchemaRegistry<Schema>(registry);
-        //this.latestSchema = registry.getLatestSchemaByTopic(topicName).getSchema();
-        Schema.Parser parser = new Schema.Parser();
-        Schema schema;
 
-        final String schemaFile = props.getProperty(KafkaBackedTableProperties.KAFKA_AVRO_SCHEMA_FILE);
-        Path pt=new Path(schemaFile);
+    try {
+      SchemaRegistry<Schema> registry = (SchemaRegistry<Schema>) Class
+          .forName("org.apache.hadoop.hive.kafka.camus" +
+              ".MemorySchemaRegistry").newInstance();
+
+      registry.init(props);
+
+      this.registry = new CachedSchemaRegistry<Schema>(registry);
+
+      Schema.Parser parser = new Schema.Parser();
+      Schema schema;
+
+      final String schemaFile = props.getProperty(KafkaBackedTableProperties
+          .KAFKA_AVRO_SCHEMA_FILE, null);
+
+      if (schemaFile != null && !schemaFile.isEmpty()) {
+
+        Path pt = new Path(schemaFile);
         FileSystem fs = FileSystem.get(new Configuration());
-        BufferedReader br=new BufferedReader(new InputStreamReader(fs.open(pt)));
+        BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pt)));
         StringBuilder line = new StringBuilder();
         String tempLine = br.readLine();
-        while (tempLine != null){
+        while (tempLine != null) {
           line.append(tempLine);
           tempLine = br.readLine();
         }
-        log.info("Avro schema: " + line.toString());
+        log.info("Setting expected schema, from file, to " + line.toString());
         try {
           schema = parser.parse(line.toString());
         } catch (Exception e) {
           throw new RuntimeException("Failed to parse Avro schema from " + schemaFile, e);
         }
-            this.latestSchema = schema;
-        } catch (Exception e) {
-            throw new MessageDecoderException(e);
-        }
+      } else {
 
-        decoderFactory = DecoderFactory.get();
-	}
+        AvroSchemaGenerator avroSchemaGenerator = new AvroSchemaGenerator();
+
+        schema = avroSchemaGenerator.getSchema(props.getProperty
+                (KafkaBackedTableProperties.COLUMN_NAMES), props.getProperty(KafkaBackedTableProperties
+                .COLUMN_TYPES), props.getProperty(KafkaBackedTableProperties.COLUMN_COMMENTS),
+            "avro.schema.namespace", "avro.schema.name", "avro.schema.doc");
+
+        log.info("Setting expected schema, from hive table schema, to " + schema);
+      }
+
+      this.latestSchema = schema;
+    } catch (Exception e) {
+      throw new MessageDecoderException(e);
+    }
+
+    decoderFactory = DecoderFactory.get();
+  }
 
 	private class MessageDecoderHelper {
 		//private Message message;
@@ -105,7 +123,7 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 		}
 
 		public Schema getTargetSchema() {
-			return targetSchema;
+      return new Schema.Parser().parse(targetSchema.toString());
 		}
 
 		private ByteBuffer getByteBuffer(byte[] payload) {
@@ -138,9 +156,15 @@ public class KafkaAvroMessageDecoder extends MessageDecoder<byte[], Record> {
 					topicName, payload).invoke();
       DatumReader<Record> reader = new GenericDatumReader<Record>(helper.getTargetSchema());
 
+      log.debug("Trying to read kafka payload");
+      log.debug("buffer: " + helper.getBuffer());
+      log.debug("start: " + helper.getStart());
+      log.debug("length: " + helper.getLength());
+      log.debug("target schema: " + helper.getTargetSchema());
+      log.debug("schema: " + helper.getSchema());
 		  GenericRecord record = reader.read(null, decoderFactory.binaryDecoder(helper.getBuffer().array(),
           helper.getStart(), helper.getLength(), null));
-
+      log.debug("Read kafka payload as " + record);
 
       AvroGenericRecordWritable grw = new AvroGenericRecordWritable(record);
       grw.setFileSchema(latestSchema);

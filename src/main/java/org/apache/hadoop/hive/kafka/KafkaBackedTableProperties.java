@@ -34,7 +34,9 @@ public class KafkaBackedTableProperties {
   public static final String KAFKA_PORT = "kafka.service.port";
   public static final String KAFKA_WHITELIST_TOPICS = "kafka.whitelist.topics";
   public static final String KAFKA_AVRO_SCHEMA_FILE = "kafka.avro.schema.file";
-  protected List<String> COLUMN_NAMES;
+  public static final String COLUMN_NAMES = "columns";
+  public static final String COLUMN_TYPES = "columns.types";
+  public static final String COLUMN_COMMENTS = "columns.comments";
 
   /*
    * This method initializes properties of the external table and populates
@@ -49,9 +51,11 @@ public class KafkaBackedTableProperties {
     jobProperties.put(KAFKA_WHITELIST_TOPICS, kafkaWhitelistTopics);
 
     // Set kafka.avro.schema.file in the jobProperty
-    String kafkaAvroSchemaFile = tableProperties.getProperty(KAFKA_AVRO_SCHEMA_FILE);
-    LOG.debug("Kafka avro schema file : " + kafkaAvroSchemaFile);
-    jobProperties.put(KAFKA_AVRO_SCHEMA_FILE, kafkaAvroSchemaFile);
+    String kafkaAvroSchemaFile = tableProperties.getProperty(KAFKA_AVRO_SCHEMA_FILE, null);
+    if (kafkaAvroSchemaFile != null) {
+      LOG.debug("Kafka avro schema file : " + kafkaAvroSchemaFile);
+      jobProperties.put(KAFKA_AVRO_SCHEMA_FILE, kafkaAvroSchemaFile);
+    }
 
     // Set kafka.url and kafka.port in the jobProperty
     String kafkaUri = tableProperties.getProperty(KAFKA_URI);
@@ -65,8 +69,19 @@ public class KafkaBackedTableProperties {
     LOG.debug("Kafka PORT : " + kafkaPort);
     jobProperties.put(KAFKA_PORT, kafkaPort);
 
-    String colNamesStr = tableDesc.getProperties().getProperty(hive_metastoreConstants
-        .META_TABLE_COLUMNS);
-    COLUMN_NAMES = Arrays.asList(colNamesStr.split(","));
+    // Set column names in the jobProperty
+    String columnNames = tableProperties.getProperty(COLUMN_NAMES);
+    LOG.debug("Column Names : " + columnNames);
+    jobProperties.put(COLUMN_NAMES, columnNames);
+
+    // Set column types in the jobProperty
+    String columnTypes = tableProperties.getProperty(COLUMN_TYPES);
+    LOG.debug("Column Types : " + columnTypes);
+    jobProperties.put(COLUMN_TYPES, columnTypes);
+
+    // Set column types in the jobProperty
+    String columnComments = tableProperties.getProperty(COLUMN_COMMENTS);
+    LOG.debug("Column Comments : " + columnComments);
+    jobProperties.put(COLUMN_COMMENTS, columnComments);
   }
 }

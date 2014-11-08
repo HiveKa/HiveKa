@@ -223,6 +223,7 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, AvroGenericReco
 
           decoder = MessageDecoderFactory.createMessageDecoder(conf, request.getTopic());
         }
+
         int count = 0;
         while (reader.getNext(key, msgValue, msgKey)) {
           readBytes += key.getMessageSize();
@@ -248,24 +249,19 @@ public class KafkaRecordReader implements RecordReader<KafkaKey, AvroGenericReco
 
           long tempTime = System.currentTimeMillis();
 
-
-
           AvroGenericRecordWritable wrapper;
           try {
             wrapper = getWrappedRecord(key.getTopic(), bytes);
           } catch (Exception e) {
               log.warn("bad record!" ,e);
-              continue;
+              throw new Exception(e);
+              //continue;
           }
 
           if (wrapper == null) {
             log.warn("bad record");
             continue;
           }
-
-
-
-
 
           long secondTime = System.currentTimeMillis();
           value.setFileSchema(wrapper.getFileSchema());
