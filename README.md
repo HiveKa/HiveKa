@@ -1,6 +1,6 @@
 # Hive Storage Handler for Kafka
 
-Apache Hive's storage handler to add support in Apache Hive to be able to query data from Apache Kafka
+HiveKa is Apache Hive's storage handler that adds support in Apache Hive to query data from Apache Kafka. This provides an opportunity to Kafka users to inspect data ingested by Kafka without writing complex Kafka consumers. Hive makes it possible to run complex analytical queries across various data sources, like, HDFS, Solr, Hbase, etc.. HiveKa extends this support to Kafka.
 
 Visit our [website](http://hiveka.weebly.com/).
 
